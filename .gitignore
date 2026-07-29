@@ -1,0 +1,34 @@
+# Build directories
+build/
+cmake-build-*/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Makefile
+
+# Testing
+Testing/
+
+# IDEs
+.vscode/
+.idea/
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+
+# Visual Studio
+.vs/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
