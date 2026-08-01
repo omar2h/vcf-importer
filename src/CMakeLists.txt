@@ -2,6 +2,7 @@ add_library(vcf_importer_lib
     vcf/vcf_parser.cpp
     config/database_config.cpp
     persistence/database.cpp
+    persistence/variant_repository.cpp
 )
 
 target_include_directories(vcf_importer_lib
