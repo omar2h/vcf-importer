@@ -1,0 +1,5 @@
+##fileformat=VCFv4.3
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
+##FORMAT=<ID=AB,Number=A,Type=Float,Description="Allelic Balance">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO    FORMAT  37829
+1	100	.	A	G	60	PASS	DP=10  AB:UNKNOWN  5:10

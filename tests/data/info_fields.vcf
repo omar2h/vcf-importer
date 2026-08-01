@@ -1,0 +1,6 @@
+##fileformat=VCFv4.3
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP membership">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+1	100	.	A	G	60	PASS	DP=10;AF=0.5;DB

@@ -1,0 +1,4 @@
+##fileformat=VCFv4.3
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER
+1	100	.	A	G	60	PASS	DP=10
