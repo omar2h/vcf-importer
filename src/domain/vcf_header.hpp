@@ -19,8 +19,8 @@ namespace vcf
     struct FieldDefinition
     {
         std::string id;
-        FieldType type;
         std::string number;
+        FieldType type;
     };
 
     struct VcfHeader
