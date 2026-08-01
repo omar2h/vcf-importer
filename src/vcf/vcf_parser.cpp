@@ -275,21 +275,41 @@ namespace vcf
             throw std::runtime_error("Failed to open VCF file: " + path.string());
         }
 
+        bool fileFormatSeen = false;
+        bool columnHeaderSeen = false;
         std::string line;
 
         while (std::getline(file, line))
         {
-            if (line.starts_with("##"))
+            if (line.starts_with("##fileformat="))
+            {
+                fileFormatSeen = true;
+            }
+            else if (line.starts_with("##"))
+            {
+                if (!fileFormatSeen)
+                    throw std::runtime_error("The first line of a VCF file must be a '##fileformat' declaration.");
                 parseMetaLine(line, result.header);
-
+            }
             else if (line.starts_with("#CHROM"))
+            {
+                if (!fileFormatSeen)
+                    throw std::runtime_error("The first line of a VCF file must be a '##fileformat' declaration.");
                 parseColumnHeader(line, result.header);
+                columnHeaderSeen = true;
+            }
             else
             {
+                if (!columnHeaderSeen)
+                    throw std::runtime_error("Variant records cannot appear before the VCF column header.");
                 result.variants.push_back(parseVariant(line, result.header));
-                // break;
             }
         }
+        if (!fileFormatSeen)
+            throw std::runtime_error("The first line of a VCF file must be a '##fileformat' declaration.");
+
+        if (!columnHeaderSeen)
+            throw std::runtime_error("Missing required VCF column header.");
 
         return result;
     }
