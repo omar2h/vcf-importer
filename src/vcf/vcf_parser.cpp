@@ -9,7 +9,8 @@ namespace vcf
 {
     namespace
     {
-        constexpr auto malformedHeader = "Malformed VCF header definition";
+        constexpr auto malformedHeaderDefinition = "Malformed VCF header definition.";
+        constexpr auto malformedColumnHeader = "Malformed VCF column header.";
         constexpr auto malformedFilter = "Malformed FILTER field.";
 
         std::string_view extractDefinition(std::string_view line)
@@ -17,7 +18,7 @@ namespace vcf
             auto begin = line.find('<');
             auto end = line.rfind('>');
             if (begin >= end || begin == std::string_view::npos || end == std::string_view::npos)
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedHeaderDefinition);
 
             // begin points to '<'
             // end points to '>'
@@ -28,7 +29,7 @@ namespace vcf
         {
             auto begin = text.find(key);
             if (begin == std::string_view::npos)
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedHeaderDefinition);
             begin += key.size();
 
             auto end = text.find(',', begin);
@@ -103,29 +104,35 @@ namespace vcf
             auto fields = split(line, '\t');
 
             if (fields.size() < 8)
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
 
             if (fields[0] != "#CHROM")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
             if (fields[1] != "POS")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
             if (fields[2] != "ID")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
             if (fields[3] != "REF")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
             if (fields[4] != "ALT")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
             if (fields[5] != "QUAL")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
             if (fields[6] != "FILTER")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
             if (fields[7] != "INFO")
-                throw std::runtime_error(malformedHeader);
+                throw std::runtime_error(malformedColumnHeader);
 
             if (fields.size() > 8)
             {
                 if (fields[8] != "FORMAT")
-                    throw std::runtime_error(malformedHeader);
+                    throw std::runtime_error(malformedColumnHeader);
+
+                if (fields.size() == 9)
+                {
+                    throw std::runtime_error("FORMAT column requires at least one sample name.");
+                }
+
                 for (size_t i = 9; i < fields.size(); i++)
                 {
                     header.sampleNames.push_back(std::string(fields[i]));
@@ -155,12 +162,73 @@ namespace vcf
             return filter;
         }
 
+        std::vector<InfoEntry> parseInfo(std::string_view field, const VcfHeader &header)
+        {
+            if (field == ".")
+                return {};
+
+            std::vector<InfoEntry> infoEntries{};
+            auto entries = split(field, ';');
+            for (const auto &entry : entries)
+            {
+                InfoEntry infoEntry{};
+                auto parts = split(entry, '=');
+                if (!header.infoDefinitions.contains(std::string(parts[0])))
+                    throw std::runtime_error("Unknown INFO field: " + std::string(parts[0]));
+
+                infoEntry.key = parts[0];
+
+                if (parts.size() != 1 && parts.size() != 2)
+                    throw std::runtime_error("Malformed INFO entry: " + std::string(entry));
+                if (parts.size() == 2)
+                {
+                    auto values = split(parts[1], ',');
+                    for (const auto &value : values)
+                    {
+                        infoEntry.values.push_back(std::string(value));
+                    }
+                }
+                infoEntries.push_back(infoEntry);
+            }
+            return infoEntries;
+        }
+
+        std::vector<Sample> parseSamples(const std::vector<std::string_view> &sampleFields,
+                                         std::string_view formatField,
+                                         const VcfHeader &header)
+        {
+            std::vector<Sample> samples;
+            auto formatKeys = split(formatField, ':');
+            for (const auto &sampleField : sampleFields)
+            {
+                Sample sample{};
+
+                auto sampleParts = split(sampleField, ':');
+                if (sampleParts.size() != formatKeys.size())
+                    throw std::runtime_error("FORMAT field count does not match sample field count.");
+
+                for (size_t i = 0; i < sampleParts.size(); ++i)
+                {
+                    if (!header.formatDefinitions.contains(std::string(formatKeys[i])))
+                        throw std::runtime_error("Unknown FORMAT field: " + std::string(formatKeys[0]));
+
+                    FormatEntry formatEntry{std::string(formatKeys[i]), {}};
+                    auto values = split(sampleParts[i], ',');
+                    for (const auto &val : values)
+                        formatEntry.values.push_back(std::string(val));
+                    sample.formatEntries.push_back(formatEntry);
+                }
+                samples.push_back(sample);
+            }
+            return samples;
+        }
+
         Variant parseVariant(std::string_view line, const VcfHeader &header)
         {
             auto fields = split(line, '\t');
 
-            if (fields.size() > 8 && fields.size() < 10)
-                throw std::runtime_error(malformedHeader);
+            if (fields.size() == 9)
+                throw std::runtime_error("FORMAT column requires at least one sample column.");
 
             Variant variant;
 
@@ -178,12 +246,23 @@ namespace vcf
 
             variant.quality = fields[5] == "." ? std::optional<double>{} : std::stod(std::string(fields[5]));
             variant.filter = parseFilter(fields[6]);
+            variant.info = parseInfo(fields[7], header);
 
-            // INFO
-            // Samples
+            if (fields.size() == 8)
+                return variant;
+
+            if (fields.size() >= 10)
+            {
+                std::vector<std::string_view> sampleFields{};
+                for (std::size_t i = 9; i < fields.size(); ++i)
+                    sampleFields.push_back(fields[i]);
+
+                variant.samples = parseSamples(sampleFields, fields[8], header);
+            }
 
             return variant;
         }
+
     }
 
     ParseResult VcfParser::parse(const std::filesystem::path &path) const
