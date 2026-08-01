@@ -10,6 +10,7 @@ namespace vcf
     namespace
     {
         constexpr auto malformedHeader = "Malformed VCF header definition";
+        constexpr auto malformedFilter = "Malformed FILTER field.";
 
         std::string_view extractDefinition(std::string_view line)
         {
@@ -99,8 +100,6 @@ namespace vcf
 
         void parseColumnHeader(std::string_view line, VcfHeader &header)
         {
-            constexpr auto malformedHeader = "Malformed VCF column header";
-
             auto fields = split(line, '\t');
 
             if (fields.size() < 8)
@@ -126,12 +125,64 @@ namespace vcf
             if (fields.size() > 8)
             {
                 if (fields[8] != "FORMAT")
-                    throw std::runtime_error("Malformed VCF column header");
+                    throw std::runtime_error(malformedHeader);
                 for (size_t i = 9; i < fields.size(); i++)
                 {
                     header.sampleNames.push_back(std::string(fields[i]));
                 }
             }
+        }
+
+        Filter parseFilter(std::string_view field)
+        {
+            if (field == ".")
+                return Filter{.status = FilterStatus::NotApplied};
+
+            if (field == "PASS")
+                return Filter{.status = FilterStatus::Passed};
+
+            Filter filter;
+            filter.status = FilterStatus::Failed;
+
+            const auto ids = split(field, ';');
+
+            for (const auto &id : ids)
+            {
+                if (id == "PASS" || id == "." || id.empty())
+                    throw std::runtime_error(malformedFilter);
+                filter.failedFilterIds.push_back(std::string(id));
+            }
+            return filter;
+        }
+
+        Variant parseVariant(std::string_view line, const VcfHeader &header)
+        {
+            auto fields = split(line, '\t');
+
+            if (fields.size() > 8 && fields.size() < 10)
+                throw std::runtime_error(malformedHeader);
+
+            Variant variant;
+
+            variant.chromosome = std::string(fields[0]);
+            variant.position = std::stoul(std::string(fields[1]));
+            variant.id = fields[2] == "." ? "" : std::string(fields[2]);
+            variant.referenceAllele = std::string(fields[3]);
+
+            if (fields[4] != ".")
+            {
+                const auto alternateAlleles = split(fields[4], ',');
+                for (const auto &alt : alternateAlleles)
+                    variant.alternateAlleles.push_back(std::string(alt));
+            }
+
+            variant.quality = fields[5] == "." ? std::optional<double>{} : std::stod(std::string(fields[5]));
+            variant.filter = parseFilter(fields[6]);
+
+            // INFO
+            // Samples
+
+            return variant;
         }
     }
 
@@ -156,7 +207,8 @@ namespace vcf
                 parseColumnHeader(line, result.header);
             else
             {
-                break;
+                result.variants.push_back(parseVariant(line, result.header));
+                // break;
             }
         }
 
