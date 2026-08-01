@@ -23,7 +23,7 @@ namespace vcf
 
         Filter filter{};
         std::vector<InfoEntry> info{};
-        Sample sample{};
+        std::vector<Sample> samples;
     };
 
 }

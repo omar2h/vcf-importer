@@ -1,20 +1,15 @@
 #pragma once
 
-#include <string>
 #include <vector>
+
+#include "format_entry.hpp"
 
 namespace vcf
 {
 
-    struct SampleField
-    {
-        std::string key;
-        std::vector<std::string> values;
-    };
-
     struct Sample
     {
-        std::vector<SampleField> fields;
+        std::vector<FormatEntry> formatEntries;
     };
 
 }
