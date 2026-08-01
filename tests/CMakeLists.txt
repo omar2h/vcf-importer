@@ -1,6 +1,7 @@
 add_executable(vcf_importer_tests
     parser/vcf_parser_tests.cpp
     config/database_config_tests.cpp
+    persistence/database_tests.cpp
 )
 
 target_compile_definitions(vcf_importer_tests

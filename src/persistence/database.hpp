@@ -1,9 +1,9 @@
 #pragma once
-
+struct sqlite3;
 namespace vcf
 {
     struct DatabaseConfig;
-    struct sqlite3;
+
     class Database
     {
     public:
