@@ -1,5 +1,6 @@
 add_library(vcf_importer_lib
     vcf/vcf_parser.cpp
+    config/database_config.cpp
 )
 
 target_include_directories(vcf_importer_lib
