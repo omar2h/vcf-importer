@@ -8,6 +8,8 @@ project(vcf_importer LANGUAGES CXX)
 
 enable_testing()
 
+find_package(SQLite3 REQUIRED)
+
 include(FetchContent)
 
 FetchContent_Declare(

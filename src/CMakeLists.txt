@@ -14,4 +14,5 @@ add_executable(vcf_importer
 target_link_libraries(vcf_importer
     PRIVATE
         vcf_importer_lib
+        SQLite::SQLite3
 )
