@@ -14,10 +14,14 @@ namespace vcf
 
         if (rc != SQLITE_OK)
         {
+            std::string error{};
             if (connection)
+            {
+                error = sqlite3_errmsg(connection);
                 sqlite3_close(connection);
+            }
 
-            throw std::runtime_error("Failed to open database " + config.databasePath.string() + ": " + sqlite3_errmsg(connection));
+            throw std::runtime_error("Failed to open database " + config.databasePath.string() + ": " + error);
         }
 
         m_connection = connection;

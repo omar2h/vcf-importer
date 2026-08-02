@@ -227,6 +227,9 @@ namespace vcf
         {
             auto fields = split(line, '\t');
 
+            if (fields.size() < 8)
+                throw std::runtime_error("Variant record must contain at least 8 columns");
+
             if (fields.size() == 9)
                 throw std::runtime_error("FORMAT column requires at least one sample column.");
 
