@@ -4,6 +4,7 @@
 #include <config/database_config.hpp>
 #include <persistence/database.hpp>
 #include <persistence/variant_repository.hpp>
+#include <domain/variant.hpp>
 
 bool objectExists(sqlite3 *connection, std::string_view type, std::string_view name)
 {
@@ -34,6 +35,11 @@ bool objectExists(sqlite3 *connection, std::string_view type, std::string_view n
     sqlite3_finalize(statement);
 
     return stepResult == SQLITE_ROW;
+}
+
+std::string_view columnText(sqlite3_stmt *statement, int column)
+{
+    return std::string_view(reinterpret_cast<const char *>(sqlite3_column_text(statement, column)));
 }
 
 TEST(VariantRepositoryTest, CreatesVariantsTable)
@@ -70,6 +76,59 @@ TEST(VariantRepositoryTest, CreatesVariantsIndex)
     variantRepository.initializeSchema();
 
     EXPECT_TRUE(objectExists(database.connection(), "index", "idx_variants_chromosome_position"));
+
+    std::filesystem::remove(databasePath);
+}
+
+TEST(VariantRepositoryTest, InsertsVariant)
+{
+    const auto databasePath = std::filesystem::temp_directory_path() / "database_test.db";
+    std::filesystem::remove(databasePath);
+
+    vcf::DatabaseConfig databaseConfig;
+    databaseConfig.databasePath = databasePath;
+
+    vcf::Database database(databaseConfig);
+
+    vcf::VariantRepository variantRepository(database);
+    variantRepository.initializeSchema();
+
+    vcf::Variant variant{};
+    variant.chromosome = "1";
+    variant.position = 100;
+    variant.referenceAllele = "A";
+    variant.alternateAlleles = {"T"};
+
+    variantRepository.insert(variant);
+
+    constexpr auto sql = R"(
+        SELECT chromosome, position, ref, alt
+        FROM variants;
+    )";
+
+    sqlite3_stmt *statement = nullptr;
+    const int rc = sqlite3_prepare_v2(database.connection(), sql, -1, &statement, nullptr);
+
+    ASSERT_EQ(rc, SQLITE_OK);
+
+    const int stepResult = sqlite3_step(statement);
+
+    ASSERT_EQ(stepResult, SQLITE_ROW);
+
+    const auto *chromosome = reinterpret_cast<const char *>(sqlite3_column_text(statement, 0));
+    EXPECT_EQ(columnText(statement, 0), "1");
+
+    EXPECT_EQ(sqlite3_column_int64(statement, 1), 100);
+
+    const auto *reference = reinterpret_cast<const char *>(sqlite3_column_text(statement, 2));
+    EXPECT_EQ(columnText(statement, 2), "A");
+
+    const auto *alternate = reinterpret_cast<const char *>(sqlite3_column_text(statement, 3));
+    EXPECT_EQ(columnText(statement, 3), "T");
+
+    EXPECT_EQ(sqlite3_step(statement), SQLITE_DONE);
+
+    sqlite3_finalize(statement);
 
     std::filesystem::remove(databasePath);
 }

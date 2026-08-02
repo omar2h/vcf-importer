@@ -8,6 +8,20 @@ project(vcf_importer LANGUAGES CXX)
 
 enable_testing()
 
+option(ENABLE_SANITIZERS "Enable AddressSanitizer and UBSan" OFF)
+
+if(ENABLE_SANITIZERS)
+    add_compile_options(
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+        -g
+    )
+
+    add_link_options(
+        -fsanitize=address,undefined
+    )
+endif()
+
 find_package(SQLite3 REQUIRED)
 
 include(FetchContent)
