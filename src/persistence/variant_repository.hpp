@@ -4,6 +4,7 @@ namespace vcf
 {
     class Database;
     struct Variant;
+    struct VcfHeader;
     class VariantRepository
     {
     public:
@@ -11,7 +12,7 @@ namespace vcf
 
         void initializeSchema();
 
-        void insert(const Variant &variant);
+        void insert(const Variant &variant, const VcfHeader &header);
 
     private:
         Database &m_database;

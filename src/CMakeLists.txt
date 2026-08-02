@@ -13,6 +13,7 @@ target_include_directories(vcf_importer_lib
 target_link_libraries(vcf_importer_lib
     PUBLIC
         SQLite::SQLite3
+        nlohmann_json::nlohmann_json
 )
 
 add_executable(vcf_importer

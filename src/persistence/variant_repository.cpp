@@ -2,9 +2,12 @@
 #include <string>
 #include <stdexcept>
 #include <sqlite3.h>
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 #include "database.hpp"
 #include "../domain/variant.hpp"
+#include "../domain/vcf_header.hpp"
 
 namespace vcf
 {
@@ -24,6 +27,120 @@ namespace vcf
             return result;
         }
 
+        std::string serializeFailedFilters(const std::vector<std::string> &failedFilterIds)
+        {
+            std::string result;
+            for (std::size_t i = 0; i < failedFilterIds.size(); ++i)
+            {
+                if (i != 0)
+                    result += ";";
+                result += failedFilterIds[i];
+            }
+            return result;
+        }
+
+        std::string serializeFieldValues(const std::vector<std::string> &entryValues)
+        {
+            std::string result;
+            for (std::size_t i = 0; i < entryValues.size(); ++i)
+            {
+                if (i != 0)
+                    result += ",";
+                result += entryValues[i];
+            }
+            return result;
+        }
+
+        json serializeFieldValue(FieldType type, const std::vector<std::string> &values)
+        {
+            if (values.empty() && type == FieldType::Flag)
+            {
+                return true;
+            }
+            else if (values.size() == 1)
+            {
+                switch (type)
+                {
+                case FieldType::Integer:
+                    return std::stoi(values.front());
+                    break;
+                case FieldType::Float:
+                    return std::stod(values.front());
+                    break;
+                case FieldType::String:
+                    return values.front();
+                    break;
+                case FieldType::Character:
+                    return values.front();
+                    break;
+                }
+            }
+            else
+            {
+                return serializeFieldValues(values);
+            }
+        }
+
+        json serializeFilter(const Filter &filter)
+        {
+            switch (filter.status)
+            {
+            case FilterStatus::NotApplied:
+                return nullptr;
+
+            case FilterStatus::Passed:
+                return "PASS";
+
+            case FilterStatus::Failed:
+                return serializeFailedFilters(filter.failedFilterIds);
+            }
+        }
+
+        json serializeQuality(std::optional<double> quality)
+        {
+            if (!quality)
+                return nullptr;
+            return *quality;
+        }
+
+        json serializeInfo(const std::vector<InfoEntry> &infoEntries, const VcfHeader &header)
+        {
+            json info = json::object();
+
+            for (const auto &entry : infoEntries)
+            {
+                FieldType type = header.infoDefinitions.at(entry.key).type;
+                info[entry.key] = serializeFieldValue(type, entry.values);
+            }
+            return info;
+        }
+
+        json serializeFormat(const std::vector<Sample> &samples, const VcfHeader &header)
+        {
+            json format = json::object();
+
+            for (const auto &sample : samples)
+            {
+                for (const auto &entry : sample.formatEntries)
+                {
+                    FieldType type = header.formatDefinitions.at(entry.key).type;
+                    format[entry.key] = serializeFieldValue(type, entry.values);
+                }
+            }
+            return format;
+        }
+
+        std::string serializeVariantData(const Variant &variant, const VcfHeader &header)
+        {
+            json data;
+
+            data["FILTER"] = serializeFilter(variant.filter);
+            data["QUAL"] = serializeQuality(variant.quality);
+            data["INFO"] = serializeInfo(variant.info, header);
+            data["FORMAT"] = serializeFormat(variant.samples, header);
+
+            return data.dump();
+        }
     }
 
     VariantRepository::VariantRepository(Database &database) : m_database(database)
@@ -67,7 +184,7 @@ namespace vcf
         }
     }
 
-    void VariantRepository::insert(const Variant &variant)
+    void VariantRepository::insert(const Variant &variant, const VcfHeader &header)
     {
         constexpr auto sql = R"(
             INSERT INTO variants (
@@ -90,12 +207,13 @@ namespace vcf
         }
 
         const auto alternateAlleles = serializeAlternateAlleles(variant.alternateAlleles);
+        const auto data = serializeVariantData(variant, header);
 
         const int bind1 = sqlite3_bind_text(statement, 1, variant.chromosome.c_str(), -1, SQLITE_TRANSIENT);
         const int bind2 = sqlite3_bind_int64(statement, 2, variant.position);
         const int bind3 = sqlite3_bind_text(statement, 3, variant.referenceAllele.c_str(), -1, SQLITE_TRANSIENT);
         const int bind4 = sqlite3_bind_text(statement, 4, alternateAlleles.c_str(), -1, SQLITE_TRANSIENT);
-        const int bind5 = sqlite3_bind_text(statement, 5, "{}", -1, SQLITE_TRANSIENT);
+        const int bind5 = sqlite3_bind_text(statement, 5, data.c_str(), -1, SQLITE_TRANSIENT);
 
         if (bind1 != SQLITE_OK || bind2 != SQLITE_OK || bind3 != SQLITE_OK || bind4 != SQLITE_OK || bind5 != SQLITE_OK)
         {

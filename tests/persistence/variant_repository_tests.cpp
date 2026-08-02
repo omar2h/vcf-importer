@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 #include <sqlite3.h>
+#include <nlohmann/json.hpp>
 
 #include <config/database_config.hpp>
 #include <persistence/database.hpp>
 #include <persistence/variant_repository.hpp>
 #include <domain/variant.hpp>
+#include <domain/vcf_header.hpp>
 
 bool objectExists(sqlite3 *connection, std::string_view type, std::string_view name)
 {
@@ -42,56 +44,78 @@ std::string_view columnText(sqlite3_stmt *statement, int column)
     return std::string_view(reinterpret_cast<const char *>(sqlite3_column_text(statement, column)));
 }
 
-TEST(VariantRepositoryTest, CreatesVariantsTable)
+nlohmann::json readVariantData(sqlite3 *connection)
 {
+    constexpr auto sql = R"(
+        SELECT data
+        FROM variants;
+    )";
 
-    const auto databasePath = std::filesystem::temp_directory_path() / "database_test.db";
-    std::filesystem::remove(databasePath);
+    sqlite3_stmt *statement = nullptr;
+
+    const int rc = sqlite3_prepare_v2(connection, sql, -1, &statement, nullptr);
+
+    EXPECT_EQ(rc, SQLITE_OK);
+
+    EXPECT_EQ(sqlite3_step(statement), SQLITE_ROW);
+
+    auto data = nlohmann::json::parse(columnText(statement, 0));
+
+    EXPECT_EQ(sqlite3_step(statement), SQLITE_DONE);
+
+    sqlite3_finalize(statement);
+
+    return data;
+}
+
+class VariantRepositoryTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        databasePath = std::filesystem::temp_directory_path() / "database_test.db";
+        std::filesystem::remove(databasePath);
+
+        databaseConfig.databasePath = databasePath;
+    }
+
+    void TearDown() override
+    {
+        std::filesystem::remove(databasePath);
+    }
 
     vcf::DatabaseConfig databaseConfig;
-    databaseConfig.databasePath = databasePath;
+    std::filesystem::path databasePath;
+};
+
+TEST_F(VariantRepositoryTest, CreatesVariantsTable)
+{
 
     vcf::Database database(databaseConfig);
 
-    vcf::VariantRepository variantRepository(database);
-    variantRepository.initializeSchema();
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
 
     EXPECT_TRUE(objectExists(database.connection(), "table", "variants"));
-
-    std::filesystem::remove(databasePath);
 }
 
-TEST(VariantRepositoryTest, CreatesVariantsIndex)
+TEST_F(VariantRepositoryTest, CreatesVariantsIndex)
 {
-
-    const auto databasePath = std::filesystem::temp_directory_path() / "database_test.db";
-    std::filesystem::remove(databasePath);
-
-    vcf::DatabaseConfig databaseConfig;
-    databaseConfig.databasePath = databasePath;
 
     vcf::Database database(databaseConfig);
 
-    vcf::VariantRepository variantRepository(database);
-    variantRepository.initializeSchema();
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
 
     EXPECT_TRUE(objectExists(database.connection(), "index", "idx_variants_chromosome_position"));
-
-    std::filesystem::remove(databasePath);
 }
 
-TEST(VariantRepositoryTest, InsertsVariant)
+TEST_F(VariantRepositoryTest, InsertsVariant)
 {
-    const auto databasePath = std::filesystem::temp_directory_path() / "database_test.db";
-    std::filesystem::remove(databasePath);
-
-    vcf::DatabaseConfig databaseConfig;
-    databaseConfig.databasePath = databasePath;
-
     vcf::Database database(databaseConfig);
 
-    vcf::VariantRepository variantRepository(database);
-    variantRepository.initializeSchema();
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
 
     vcf::Variant variant{};
     variant.chromosome = "1";
@@ -99,7 +123,8 @@ TEST(VariantRepositoryTest, InsertsVariant)
     variant.referenceAllele = "A";
     variant.alternateAlleles = {"T"};
 
-    variantRepository.insert(variant);
+    vcf::VcfHeader header{};
+    repository.insert(variant, header);
 
     constexpr auto sql = R"(
         SELECT chromosome, position, ref, alt
@@ -115,20 +140,98 @@ TEST(VariantRepositoryTest, InsertsVariant)
 
     ASSERT_EQ(stepResult, SQLITE_ROW);
 
-    const auto *chromosome = reinterpret_cast<const char *>(sqlite3_column_text(statement, 0));
     EXPECT_EQ(columnText(statement, 0), "1");
 
     EXPECT_EQ(sqlite3_column_int64(statement, 1), 100);
 
-    const auto *reference = reinterpret_cast<const char *>(sqlite3_column_text(statement, 2));
     EXPECT_EQ(columnText(statement, 2), "A");
 
-    const auto *alternate = reinterpret_cast<const char *>(sqlite3_column_text(statement, 3));
     EXPECT_EQ(columnText(statement, 3), "T");
 
     EXPECT_EQ(sqlite3_step(statement), SQLITE_DONE);
 
     sqlite3_finalize(statement);
+}
 
-    std::filesystem::remove(databasePath);
+TEST_F(VariantRepositoryTest, SerializesPassedFilter)
+{
+    vcf::Database database(databaseConfig);
+
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
+
+    vcf::Variant variant{};
+    variant.chromosome = "1";
+    variant.position = 100;
+    variant.referenceAllele = "A";
+    variant.alternateAlleles = {"T"};
+
+    variant.filter.status = vcf::FilterStatus::Passed;
+
+    vcf::VcfHeader header;
+
+    repository.insert(variant, header);
+
+    auto data = readVariantData(database.connection());
+
+    EXPECT_EQ(data["FILTER"], "PASS");
+}
+
+TEST_F(VariantRepositoryTest, SerializesMissingFilter)
+{
+    vcf::Database database(databaseConfig);
+
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
+
+    vcf::Variant variant;
+    variant.filter.status = vcf::FilterStatus::NotApplied;
+
+    vcf::VcfHeader header;
+
+    repository.insert(variant, header);
+
+    auto data = readVariantData(database.connection());
+
+    EXPECT_TRUE(data["FILTER"].is_null());
+}
+
+TEST_F(VariantRepositoryTest, SerializesMissingQuality)
+{
+    vcf::Database database(databaseConfig);
+
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
+
+    vcf::Variant variant;
+
+    variant.quality.reset();
+
+    vcf::VcfHeader header;
+
+    repository.insert(variant, header);
+
+    auto data = readVariantData(database.connection());
+
+    EXPECT_TRUE(data["QUAL"].is_null());
+}
+
+TEST_F(VariantRepositoryTest, SerializesQuality)
+{
+    vcf::Database database(databaseConfig);
+
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
+
+    vcf::Variant variant;
+
+    variant.quality = 42.5;
+
+    vcf::VcfHeader header;
+
+    repository.insert(variant, header);
+
+    auto data = readVariantData(database.connection());
+
+    EXPECT_EQ(data["QUAL"], 42.5);
 }
