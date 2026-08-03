@@ -53,37 +53,41 @@ namespace vcf
 
         json serializeFieldValue(FieldType type, const std::vector<std::string> &values)
         {
-            if (values.empty() && type == FieldType::Flag)
+            if (type == FieldType::Flag)
             {
-                return true;
-            }
-            else if (values.size() == 1)
-            {
-                const auto &value = values.front();
+                if (values.empty())
+                    return true;
 
-                if (value == ".")
-                    return nullptr;
-
-                switch (type)
-                {
-                case FieldType::Integer:
-                    return std::stoi(value);
-                    break;
-                case FieldType::Float:
-                    return std::stod(value);
-                    break;
-                case FieldType::String:
-                    return value;
-                    break;
-                case FieldType::Character:
-                    return value;
-                    break;
-                }
+                throw std::logic_error("Flag field must not contain values");
             }
-            else
-            {
+
+            if (values.empty())
+                throw std::logic_error("Non-flag field must contain a value");
+
+            if (values.size() > 1)
                 return serializeFieldValues(values);
+
+            const auto &value = values.front();
+            if (value == ".")
+                return nullptr;
+
+            switch (type)
+            {
+            case FieldType::Integer:
+                return std::stoi(value);
+                break;
+            case FieldType::Float:
+                return std::stod(value);
+                break;
+            case FieldType::String:
+                return value;
+                break;
+            case FieldType::Character:
+                return value;
+                break;
             }
+
+            throw std::logic_error("Unsupported field type");
         }
 
         json serializeFilter(const Filter &filter)
@@ -99,6 +103,7 @@ namespace vcf
             case FilterStatus::Failed:
                 return serializeFailedFilters(filter.failedFilterIds);
             }
+            throw std::logic_error("Unsupported filter status");
         }
 
         json serializeQuality(std::optional<double> quality)
