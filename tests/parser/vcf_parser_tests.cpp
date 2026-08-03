@@ -32,27 +32,38 @@ TEST(VcfParserTest, ParsesMultipleVariants)
 {
     vcf::VcfParser parser(dataPath("multiple_variants.vcf"));
 
-    vcf::Variant first;
-    vcf::Variant second;
+    vcf::Variant variant;
 
-    ASSERT_TRUE(parser.readNextVariant(first));
-    ASSERT_TRUE(parser.readNextVariant(second));
-    EXPECT_FALSE(parser.readNextVariant(second));
+    ASSERT_TRUE(parser.readNextVariant(variant));
+    EXPECT_EQ(variant.position, 100);
+    EXPECT_EQ(variant.referenceAllele, "A");
 
-    EXPECT_EQ(first.position, 100);
-    EXPECT_EQ(second.position, 200);
+    ASSERT_TRUE(parser.readNextVariant(variant));
+    EXPECT_EQ(variant.position, 200);
+    EXPECT_EQ(variant.referenceAllele, "C");
 
-    EXPECT_EQ(first.referenceAllele, "A");
-    EXPECT_EQ(second.referenceAllele, "C");
+    EXPECT_FALSE(parser.readNextVariant(variant));
 }
 
-// TEST(VcfParserTest, ParsesLargeFile)
-// {
-//     vcf::VcfParser parser(dataPath("/home/omar/datasets/assignment.final.vcf"));
+TEST(VcfParserTest, ThrowsWhenFileCannotBeOpened)
+{
+    EXPECT_THROW(vcf::VcfParser(dataPath("missing.vcf")), std::runtime_error);
+}
 
-//     vcf::Variant variant;
-//     while (parser.readNextVariant(variant))
-//         ;
+TEST(VcfParserTest, ThrowsForMalformedVariant)
+{
+    vcf::VcfParser parser(dataPath("malformed_variant.vcf"));
+    vcf::Variant variant;
 
-//     EXPECT_TRUE(true);
-// }
+    EXPECT_THROW(parser.readNextVariant(variant), std::runtime_error);
+}
+
+TEST(VcfParserTest, ExposesParsedHeader)
+{
+    vcf::VcfParser parser(dataPath("info_fields.vcf"));
+
+    const auto &header = parser.header();
+
+    EXPECT_FALSE(header.infoDefinitions.empty());
+    EXPECT_FALSE(header.formatDefinitions.empty());
+}

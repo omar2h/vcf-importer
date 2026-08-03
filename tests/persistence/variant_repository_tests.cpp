@@ -55,13 +55,36 @@ nlohmann::json readVariantData(sqlite3 *connection)
 
     const int rc = sqlite3_prepare_v2(connection, sql, -1, &statement, nullptr);
 
+    if (rc != SQLITE_OK)
+        throw std::runtime_error("Failed to prepare data query");
+
     EXPECT_EQ(rc, SQLITE_OK);
 
-    EXPECT_EQ(sqlite3_step(statement), SQLITE_ROW);
+    const int stepResult = sqlite3_step(statement);
 
-    auto data = nlohmann::json::parse(columnText(statement, 0));
+    if (stepResult != SQLITE_ROW)
+    {
+        sqlite3_finalize(statement);
+        throw std::runtime_error("Variant row not found");
+    }
 
-    EXPECT_EQ(sqlite3_step(statement), SQLITE_DONE);
+    const auto *text = sqlite3_column_text(statement, 0);
+
+    if (!text)
+    {
+        sqlite3_finalize(statement);
+        throw std::runtime_error("Variant data is null");
+    }
+
+    auto data = nlohmann::json::parse(text);
+
+    const int secondStep = sqlite3_step(statement);
+
+    if (secondStep != SQLITE_DONE)
+    {
+        sqlite3_finalize(statement);
+        throw std::runtime_error("Expected exactly one variant row");
+    }
 
     sqlite3_finalize(statement);
 
@@ -101,13 +124,27 @@ TEST_F(VariantRepositoryTest, CreatesVariantsTable)
 
 TEST_F(VariantRepositoryTest, CreatesVariantsIndex)
 {
-
     vcf::Database database(databaseConfig);
-
     vcf::VariantRepository repository(database);
+
     repository.initializeSchema();
 
+    EXPECT_FALSE(objectExists(database.connection(), "index", "idx_variants_chromosome_position"));
+
+    repository.createIndex();
+
     EXPECT_TRUE(objectExists(database.connection(), "index", "idx_variants_chromosome_position"));
+}
+
+TEST_F(VariantRepositoryTest, InsertBeforeInitializationThrows)
+{
+    vcf::Database database(databaseConfig);
+    vcf::VariantRepository repository(database);
+
+    vcf::Variant variant;
+    vcf::VcfHeader header;
+
+    EXPECT_THROW(repository.insert(variant, header), std::logic_error);
 }
 
 TEST_F(VariantRepositoryTest, InsertsVariant)
