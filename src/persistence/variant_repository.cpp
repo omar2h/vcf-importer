@@ -59,19 +59,24 @@ namespace vcf
             }
             else if (values.size() == 1)
             {
+                const auto &value = values.front();
+
+                if (value == ".")
+                    return nullptr;
+
                 switch (type)
                 {
                 case FieldType::Integer:
-                    return std::stoi(values.front());
+                    return std::stoi(value);
                     break;
                 case FieldType::Float:
-                    return std::stod(values.front());
+                    return std::stod(value);
                     break;
                 case FieldType::String:
-                    return values.front();
+                    return value;
                     break;
                 case FieldType::Character:
-                    return values.front();
+                    return value;
                     break;
                 }
             }

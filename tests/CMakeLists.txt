@@ -3,6 +3,7 @@ add_executable(vcf_importer_tests
     config/database_config_tests.cpp
     persistence/database_tests.cpp
     persistence/variant_repository_tests.cpp
+    persistence/database_transaction_tests.cpp
 )
 
 target_compile_definitions(vcf_importer_tests

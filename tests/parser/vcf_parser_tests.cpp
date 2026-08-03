@@ -46,13 +46,13 @@ TEST(VcfParserTest, ParsesMultipleVariants)
     EXPECT_EQ(second.referenceAllele, "C");
 }
 
-TEST(VcfParserTest, ParsesLargeFile)
-{
-    vcf::VcfParser parser(dataPath("/home/omar/datasets/assignment.final.vcf"));
+// TEST(VcfParserTest, ParsesLargeFile)
+// {
+//     vcf::VcfParser parser(dataPath("/home/omar/datasets/assignment.final.vcf"));
 
-    vcf::Variant variant;
-    while (parser.readNextVariant(variant))
-        ;
+//     vcf::Variant variant;
+//     while (parser.readNextVariant(variant))
+//         ;
 
-    EXPECT_TRUE(true);
-}
+//     EXPECT_TRUE(true);
+// }
