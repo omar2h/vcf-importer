@@ -152,6 +152,45 @@ namespace vcf
     {
     }
 
+    VariantRepository::~VariantRepository() noexcept
+    {
+        if (m_insertStatement)
+        {
+            sqlite3_finalize(m_insertStatement);
+        }
+    }
+
+    void VariantRepository::prepareInsertStatement()
+    {
+        constexpr auto sql = R"(
+            INSERT INTO variants (
+                chromosome,
+                position,
+                ref,
+                alt,
+                data
+            )
+            VALUES (?, ?, ?, ?, ?);
+        )";
+
+        const int rc = sqlite3_prepare_v2(m_database.connection(), sql, -1, &m_insertStatement, nullptr);
+
+        if (rc != SQLITE_OK)
+        {
+            sqlite3_finalize(m_insertStatement);
+            m_insertStatement = nullptr;
+
+            const std::string message = sqlite3_errmsg(m_database.connection());
+            throw std::runtime_error("Failed to prepare variant insert statement: " + message);
+        }
+    }
+
+    void VariantRepository::resetInsertStatement() noexcept
+    {
+        sqlite3_reset(m_insertStatement);
+        sqlite3_clear_bindings(m_insertStatement);
+    }
+
     void VariantRepository::initializeSchema()
     {
         constexpr auto schema = R"(
@@ -187,53 +226,39 @@ namespace vcf
 
             throw std::runtime_error("Failed to initialize database schema: " + message);
         }
+
+        if (!m_insertStatement)
+            prepareInsertStatement();
     }
 
     void VariantRepository::insert(const Variant &variant, const VcfHeader &header)
     {
-        constexpr auto sql = R"(
-            INSERT INTO variants (
-                chromosome,
-                position,
-                ref,
-                alt,
-                data
-            )
-            VALUES (?, ?, ?, ?, ?);
-        )";
-
-        sqlite3_stmt *statement = nullptr;
-        const int rc = sqlite3_prepare_v2(m_database.connection(), sql, -1, &statement, nullptr);
-
-        if (rc != SQLITE_OK)
-        {
-            sqlite3_finalize(statement);
-            throw std::runtime_error("Failed to insert");
-        }
+        if (!m_insertStatement)
+            throw std::logic_error("VariantRepository must be initialized before insert");
 
         const auto alternateAlleles = serializeAlternateAlleles(variant.alternateAlleles);
         const auto data = serializeVariantData(variant, header);
 
-        const int bind1 = sqlite3_bind_text(statement, 1, variant.chromosome.c_str(), -1, SQLITE_TRANSIENT);
-        const int bind2 = sqlite3_bind_int64(statement, 2, variant.position);
-        const int bind3 = sqlite3_bind_text(statement, 3, variant.referenceAllele.c_str(), -1, SQLITE_TRANSIENT);
-        const int bind4 = sqlite3_bind_text(statement, 4, alternateAlleles.c_str(), -1, SQLITE_TRANSIENT);
-        const int bind5 = sqlite3_bind_text(statement, 5, data.c_str(), -1, SQLITE_TRANSIENT);
+        const int bind1 = sqlite3_bind_text(m_insertStatement, 1, variant.chromosome.c_str(), -1, SQLITE_TRANSIENT);
+        const int bind2 = sqlite3_bind_int64(m_insertStatement, 2, variant.position);
+        const int bind3 = sqlite3_bind_text(m_insertStatement, 3, variant.referenceAllele.c_str(), -1, SQLITE_TRANSIENT);
+        const int bind4 = sqlite3_bind_text(m_insertStatement, 4, alternateAlleles.c_str(), -1, SQLITE_TRANSIENT);
+        const int bind5 = sqlite3_bind_text(m_insertStatement, 5, data.c_str(), -1, SQLITE_TRANSIENT);
 
         if (bind1 != SQLITE_OK || bind2 != SQLITE_OK || bind3 != SQLITE_OK || bind4 != SQLITE_OK || bind5 != SQLITE_OK)
         {
-            sqlite3_finalize(statement);
+            resetInsertStatement();
             throw std::runtime_error("Failed to insert");
         }
 
-        const int stepResult = sqlite3_step(statement);
+        const int stepResult = sqlite3_step(m_insertStatement);
 
         if (stepResult != SQLITE_DONE)
         {
-            sqlite3_finalize(statement);
+            resetInsertStatement();
             throw std::runtime_error("Failed to insert");
         }
 
-        sqlite3_finalize(statement);
+        resetInsertStatement();
     }
 }
