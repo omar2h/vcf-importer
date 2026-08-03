@@ -1,4 +1,3 @@
-#include <chrono>
 #include <cstdlib>
 #include <iostream>
 
@@ -20,7 +19,7 @@ int main(int argc, char *argv[])
             printUsage();
             return EXIT_FAILURE;
         }
-        std::filesystem::path vcfPath{argv[2]};
+        const std::filesystem::path vcfPath{argv[2]};
         vcf::VcfParser parser(vcfPath);
         vcf::Database database(vcf::loadDatabaseConfigFromEnvironment());
         vcf::VariantRepository repository(database);
@@ -30,28 +29,21 @@ int main(int argc, char *argv[])
 
         std::size_t variantCount = 0;
 
-        const auto start = std::chrono::steady_clock::now();
-
         while (parser.readNextVariant(variant))
         {
-            ++variantCount;
             repository.insert(variant, parser.header());
+            ++variantCount;
         }
         repository.createIndex();
         transaction.commit();
 
-        const auto end = std::chrono::steady_clock::now();
-
-        std::cout << "Variants: " << variantCount << '\n';
-        std::cout << "Elapsed: "
-                  << std::chrono::duration<double>(end - start).count()
-                  << " s\n";
+        std::cout << "Imported variants: " << variantCount << '\n';
 
         return EXIT_SUCCESS;
     }
     catch (const std::exception &e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << "Error: " << e.what() << '\n';
         return EXIT_FAILURE;
     }
 }
