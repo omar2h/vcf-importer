@@ -1,4 +1,7 @@
+#include <chrono>
+#include <cstdlib>
 #include <iostream>
+
 #include <config/database_config.hpp>
 #include <persistence/database.hpp>
 #include <persistence/variant_repository.hpp>
@@ -15,32 +18,26 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     std::filesystem::path vcfPath{argv[2]};
+    vcf::VcfParser parser(vcfPath);
+    vcf::Variant variant;
 
-    try
+    std::size_t variantCount = 0;
+
+    const auto start = std::chrono::steady_clock::now();
+
+    while (parser.readNextVariant(variant))
     {
-        auto databaseConfig = vcf::loadDatabaseConfigFromEnvironment();
-
-        vcf::Database database(databaseConfig);
-
-        vcf::VariantRepository repository(database);
-
-        repository.initializeSchema();
-
-        vcf::VcfParser parser;
-        auto result = parser.parse(vcfPath);
-
-        for (const auto &variant : result.variants)
-        {
-            repository.insert(variant, result.header);
-        }
-
-        return EXIT_SUCCESS;
+        ++variantCount;
     }
-    catch (const std::exception &exception)
-    {
-        std::cerr << exception.what() << '\n';
-        return EXIT_FAILURE;
-    }
+
+    const auto end = std::chrono::steady_clock::now();
+
+    std::cout << "Variants: " << variantCount << '\n';
+    std::cout << "Elapsed: "
+              << std::chrono::duration<double>(end - start).count()
+              << " s\n";
+
+    return EXIT_SUCCESS;
 }
 
 void printUsage()

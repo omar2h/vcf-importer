@@ -268,21 +268,45 @@ namespace vcf
 
     }
 
-    ParseResult VcfParser::parse(const std::filesystem::path &path) const
+    VcfParser::VcfParser(const std::filesystem::path &path) : m_file(path)
     {
-        ParseResult result;
-        std::ifstream file(path);
-
-        if (!file)
+        if (!m_file)
         {
             throw std::runtime_error("Failed to open VCF file: " + path.string());
         }
+        parseHeader();
+    }
 
+    bool VcfParser::readNextVariant(Variant &variant)
+    {
+        std::string line;
+
+        if (!std::getline(m_file, line))
+        {
+            if (m_file.eof())
+            {
+                return false;
+            }
+
+            throw std::runtime_error("Failed while reading VCF file.");
+        }
+
+        variant = parseVariant(line, m_header);
+        return true;
+    }
+
+    const VcfHeader &VcfParser::header() const
+    {
+        return m_header;
+    }
+
+    void VcfParser::parseHeader()
+    {
         bool fileFormatSeen = false;
         bool columnHeaderSeen = false;
         std::string line;
 
-        while (std::getline(file, line))
+        while (std::getline(m_file, line))
         {
             if (line.starts_with("##fileformat="))
             {
@@ -292,20 +316,15 @@ namespace vcf
             {
                 if (!fileFormatSeen)
                     throw std::runtime_error("The first line of a VCF file must be a '##fileformat' declaration.");
-                parseMetaLine(line, result.header);
+                parseMetaLine(line, m_header);
             }
             else if (line.starts_with("#CHROM"))
             {
                 if (!fileFormatSeen)
                     throw std::runtime_error("The first line of a VCF file must be a '##fileformat' declaration.");
-                parseColumnHeader(line, result.header);
+                parseColumnHeader(line, m_header);
                 columnHeaderSeen = true;
-            }
-            else
-            {
-                if (!columnHeaderSeen)
-                    throw std::runtime_error("Variant records cannot appear before the VCF column header.");
-                result.variants.push_back(parseVariant(line, result.header));
+                break;
             }
         }
         if (!fileFormatSeen)
@@ -313,8 +332,5 @@ namespace vcf
 
         if (!columnHeaderSeen)
             throw std::runtime_error("Missing required VCF column header.");
-
-        return result;
     }
-
 }

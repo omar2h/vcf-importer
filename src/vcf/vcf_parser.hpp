@@ -1,9 +1,10 @@
 #pragma once
 
-#include <vector>
 #include <filesystem>
+#include <fstream>
 
-#include "parse_result.hpp"
+#include "../domain/variant.hpp"
+#include "../domain/vcf_header.hpp"
 
 namespace vcf
 {
@@ -11,6 +12,18 @@ namespace vcf
     class VcfParser
     {
     public:
-        ParseResult parse(const std::filesystem::path &path) const;
+        explicit VcfParser(const std::filesystem::path &path);
+
+        const VcfHeader &header() const;
+
+        [[nodiscard]]
+        bool readNextVariant(Variant &variant);
+
+    private:
+        void parseHeader();
+
+    private:
+        std::ifstream m_file{};
+        VcfHeader m_header{};
     };
 }
