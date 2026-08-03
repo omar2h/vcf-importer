@@ -19,6 +19,7 @@ namespace vcf
         VariantRepository &operator=(VariantRepository &&) = delete;
 
         void initializeSchema();
+        void createIndex();
         void insert(const Variant &variant, const VcfHeader &header);
 
     private:

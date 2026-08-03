@@ -203,9 +203,6 @@ namespace vcf
                 alt TEXT NOT NULL,
                 data TEXT NOT NULL
             );
-
-            CREATE INDEX IF NOT EXISTS idx_variants_chromosome_position
-            ON variants(chromosome, position);
         )";
 
         char *errorMessage = nullptr;
@@ -229,6 +226,33 @@ namespace vcf
 
         if (!m_insertStatement)
             prepareInsertStatement();
+    }
+
+    void VariantRepository::createIndex()
+    {
+        constexpr auto schema = R"(
+            CREATE INDEX IF NOT EXISTS idx_variants_chromosome_position
+            ON variants(chromosome, position);
+        )";
+
+        char *errorMessage = nullptr;
+
+        const int rc = sqlite3_exec(
+            m_database.connection(),
+            schema,
+            nullptr,
+            nullptr,
+            &errorMessage);
+
+        if (rc != SQLITE_OK)
+        {
+            const std::string message = errorMessage ? errorMessage : "Unknown SQLite error";
+
+            if (errorMessage)
+                sqlite3_free(errorMessage);
+
+            throw std::runtime_error("Failed to initialize database schema: " + message);
+        }
     }
 
     void VariantRepository::insert(const Variant &variant, const VcfHeader &header)

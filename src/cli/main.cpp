@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
             ++variantCount;
             repository.insert(variant, parser.header());
         }
+        repository.createIndex();
         transaction.commit();
 
         const auto end = std::chrono::steady_clock::now();
