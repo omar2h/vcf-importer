@@ -225,13 +225,29 @@ namespace vcf
 
         Variant parseVariant(std::string_view line, const VcfHeader &header)
         {
+            constexpr std::size_t fixedFieldCount = 8;
+            constexpr std::size_t fieldCountWithFormat = 9;
             auto fields = split(line, '\t');
 
-            if (fields.size() < 8)
+            if (fields.size() < fixedFieldCount)
                 throw std::runtime_error("Variant record must contain at least 8 columns");
 
-            if (fields.size() == 9)
-                throw std::runtime_error("FORMAT column requires at least one sample column.");
+            if (header.sampleNames.empty())
+            {
+                if (fields.size() != fixedFieldCount)
+                    throw std::runtime_error(
+                        "Variant contains FORMAT or sample columns, but the header declares no samples");
+            }
+            else
+            {
+                const auto expectedFieldCount = fieldCountWithFormat + header.sampleNames.size();
+
+                if (fields.size() != expectedFieldCount)
+                {
+                    throw std::runtime_error(
+                        "Variant sample count does not match VCF header");
+                }
+            }
 
             Variant variant;
 
@@ -251,21 +267,19 @@ namespace vcf
             variant.filter = parseFilter(fields[6]);
             variant.info = parseInfo(fields[7], header);
 
-            if (fields.size() == 8)
+            if (header.sampleNames.empty())
                 return variant;
 
-            if (fields.size() >= 10)
-            {
-                std::vector<std::string_view> sampleFields{};
-                for (std::size_t i = 9; i < fields.size(); ++i)
-                    sampleFields.push_back(fields[i]);
+            std::vector<std::string_view> sampleFields;
+            sampleFields.reserve(header.sampleNames.size());
 
-                variant.samples = parseSamples(sampleFields, fields[8], header);
-            }
+            for (std::size_t i = fieldCountWithFormat; i < fields.size(); ++i)
+                sampleFields.push_back(fields[i]);
+
+            variant.samples = parseSamples(sampleFields, fields[8], header);
 
             return variant;
         }
-
     }
 
     VcfParser::VcfParser(const std::filesystem::path &path) : m_file(path)
@@ -333,4 +347,5 @@ namespace vcf
         if (!columnHeaderSeen)
             throw std::runtime_error("Missing required VCF column header.");
     }
+
 }

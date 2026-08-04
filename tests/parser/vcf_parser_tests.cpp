@@ -130,6 +130,15 @@ TEST(VcfParserTest, ParsesMultipleSamples)
     EXPECT_EQ(variant.samples[1].formatEntries[1].values[0], "25");
 }
 
+TEST(VcfParserTest, RejectsMissingSampleColumn)
+{
+    vcf::VcfParser parser{dataPath("missing_sample_column.vcf")};
+
+    vcf::Variant variant;
+
+    EXPECT_THROW(static_cast<void>(parser.readNextVariant(variant)), std::runtime_error);
+}
+
 TEST(VcfParserTest, RejectsUnknownInfoField)
 {
     vcf::VcfParser parser(dataPath("unknown_info.vcf"));
