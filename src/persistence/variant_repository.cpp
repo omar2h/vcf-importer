@@ -284,16 +284,18 @@ namespace vcf
 
         if (bind1 != SQLITE_OK || bind2 != SQLITE_OK || bind3 != SQLITE_OK || bind4 != SQLITE_OK || bind5 != SQLITE_OK)
         {
+            const std::string message = "Failed to bind variant: " + std::string(sqlite3_errmsg(m_database.connection()));
             resetInsertStatement();
-            throw std::runtime_error("Failed to insert");
+            throw std::runtime_error(message);
         }
 
         const int stepResult = sqlite3_step(m_insertStatement);
 
         if (stepResult != SQLITE_DONE)
         {
+            const std::string message = "Failed to execute variant insert: " + std::string(sqlite3_errmsg(m_database.connection()));
             resetInsertStatement();
-            throw std::runtime_error("Failed to insert");
+            throw std::runtime_error(message);
         }
 
         resetInsertStatement();

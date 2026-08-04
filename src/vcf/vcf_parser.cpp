@@ -210,7 +210,7 @@ namespace vcf
                 for (size_t i = 0; i < sampleParts.size(); ++i)
                 {
                     if (!header.formatDefinitions.contains(std::string(formatKeys[i])))
-                        throw std::runtime_error("Unknown FORMAT field: " + std::string(formatKeys[0]));
+                        throw std::runtime_error("Unknown FORMAT field: " + std::string(formatKeys[i]));
 
                     FormatEntry formatEntry{std::string(formatKeys[i]), {}};
                     auto values = split(sampleParts[i], ',');
