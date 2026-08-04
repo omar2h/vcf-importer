@@ -3,10 +3,16 @@
 #include <nlohmann/json.hpp>
 
 #include <config/database_config.hpp>
+#include <vcf/vcf_parser.hpp>
 #include <persistence/database.hpp>
 #include <persistence/variant_repository.hpp>
 #include <domain/variant.hpp>
 #include <domain/vcf_header.hpp>
+
+std::filesystem::path dataPath(std::string_view filename)
+{
+    return std::filesystem::path(TEST_DATA_DIR) / filename;
+}
 
 bool objectExists(sqlite3 *connection, std::string_view type, std::string_view name)
 {
@@ -188,6 +194,31 @@ TEST_F(VariantRepositoryTest, InsertsVariant)
     EXPECT_EQ(sqlite3_step(statement), SQLITE_DONE);
 
     sqlite3_finalize(statement);
+}
+
+TEST_F(VariantRepositoryTest, PreservesFormatValuesForMultipleSamples)
+{
+    vcf::Database database(databaseConfig);
+    vcf::VcfParser parser(dataPath("multiple_samples.vcf"));
+
+    vcf::Variant variant;
+    ASSERT_TRUE(parser.readNextVariant(variant));
+
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
+
+    repository.insert(variant, parser.header());
+
+    const auto json = readVariantData(database.connection());
+
+    ASSERT_TRUE(json["FORMAT"].contains("SAMPLE_A"));
+    ASSERT_TRUE(json["FORMAT"].contains("SAMPLE_B"));
+
+    EXPECT_EQ(json["FORMAT"]["SAMPLE_A"]["GT"], "0/1");
+    EXPECT_EQ(json["FORMAT"]["SAMPLE_A"]["DP"], 10);
+
+    EXPECT_EQ(json["FORMAT"]["SAMPLE_B"]["GT"], "1/1");
+    EXPECT_EQ(json["FORMAT"]["SAMPLE_B"]["DP"], 25);
 }
 
 TEST_F(VariantRepositoryTest, SerializesPassedFilter)

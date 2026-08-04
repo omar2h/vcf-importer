@@ -127,15 +127,23 @@ namespace vcf
 
         json serializeFormat(const std::vector<Sample> &samples, const VcfHeader &header)
         {
+            if (samples.size() != header.sampleNames.size())
+                throw std::runtime_error("Sample count does not match VCF header sample names");
+
             json format = json::object();
 
-            for (const auto &sample : samples)
+            for (std::size_t i = 0; i < samples.size(); ++i)
             {
+                const auto &sample = samples[i];
+                const auto &sampleName = header.sampleNames[i];
+                json sampleObject = json::object();
+
                 for (const auto &entry : sample.formatEntries)
                 {
                     FieldType type = header.formatDefinitions.at(entry.key).type;
-                    format[entry.key] = serializeFieldValue(type, entry.values);
+                    sampleObject[entry.key] = serializeFieldValue(type, entry.values);
                 }
+                format[sampleName] = std::move(sampleObject);
             }
             return format;
         }

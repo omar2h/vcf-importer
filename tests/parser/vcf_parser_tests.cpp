@@ -106,6 +106,30 @@ TEST(VcfParserTest, ParsesInfoFields)
     EXPECT_TRUE(db.values.empty());
 }
 
+TEST(VcfParserTest, ParsesMultipleSamples)
+{
+    vcf::VcfParser parser(dataPath("multiple_samples.vcf"));
+
+    vcf::Variant variant;
+    ASSERT_TRUE(parser.readNextVariant(variant));
+
+    ASSERT_EQ(parser.header().sampleNames.size(), 2u);
+    EXPECT_EQ(parser.header().sampleNames[0], "SAMPLE_A");
+    EXPECT_EQ(parser.header().sampleNames[1], "SAMPLE_B");
+
+    ASSERT_EQ(variant.samples.size(), 2u);
+
+    ASSERT_EQ(variant.samples[0].formatEntries.size(), 2u);
+    EXPECT_EQ(variant.samples[0].formatEntries[0].key, "GT");
+    EXPECT_EQ(variant.samples[0].formatEntries[0].values[0], "0/1");
+    EXPECT_EQ(variant.samples[0].formatEntries[1].key, "DP");
+    EXPECT_EQ(variant.samples[0].formatEntries[1].values[0], "10");
+
+    ASSERT_EQ(variant.samples[1].formatEntries.size(), 2u);
+    EXPECT_EQ(variant.samples[1].formatEntries[0].values[0], "1/1");
+    EXPECT_EQ(variant.samples[1].formatEntries[1].values[0], "25");
+}
+
 TEST(VcfParserTest, RejectsUnknownInfoField)
 {
     vcf::VcfParser parser(dataPath("unknown_info.vcf"));
