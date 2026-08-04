@@ -303,3 +303,41 @@ TEST_F(VariantRepositoryTest, SerializesQuality)
 
     EXPECT_EQ(data["QUAL"], 42.5);
 }
+
+TEST_F(VariantRepositoryTest, PersistsParsedVariantAsTypedJson)
+{
+    vcf::VcfParser parser(dataPath("complete_variant.vcf"));
+    vcf::Database database(databaseConfig);
+
+    vcf::VariantRepository repository(database);
+    repository.initializeSchema();
+
+    vcf::Variant variant;
+    ASSERT_TRUE(parser.readNextVariant(variant));
+
+    repository.insert(variant, parser.header());
+
+    const auto json = readVariantData(database.connection());
+
+    ASSERT_TRUE(json["FILTER"].is_string());
+    EXPECT_EQ(json["FILTER"], "PASS");
+
+    ASSERT_TRUE(json["QUAL"].is_number());
+    EXPECT_DOUBLE_EQ(json["QUAL"].get<double>(), 60.5);
+
+    ASSERT_TRUE(json["INFO"].is_object());
+
+    ASSERT_TRUE(json["INFO"]["DP"].is_number_integer());
+    EXPECT_EQ(json["INFO"]["DP"], 20);
+
+    ASSERT_TRUE(json["INFO"]["AF"].is_number_float());
+    EXPECT_DOUBLE_EQ(json["INFO"]["AF"].get<double>(), 0.25);
+
+    ASSERT_TRUE(json["INFO"]["DB"].is_boolean());
+    EXPECT_TRUE(json["INFO"]["DB"].get<bool>());
+
+    ASSERT_TRUE(json["FORMAT"].is_object());
+
+    EXPECT_EQ(json["FORMAT"]["SAMPLE_A"]["GT"], "0/1");
+    EXPECT_EQ(json["FORMAT"]["SAMPLE_A"]["GQ"], 42);
+}
