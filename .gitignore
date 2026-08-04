@@ -3,6 +3,7 @@ build/
 build-asan/
 build-release/
 build-profile/
+build-valgrind/
 cmake-build-*/
 
 # CMake

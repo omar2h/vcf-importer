@@ -67,3 +67,72 @@ TEST(VcfParserTest, ExposesParsedHeader)
     EXPECT_FALSE(header.infoDefinitions.empty());
     EXPECT_FALSE(header.formatDefinitions.empty());
 }
+
+TEST(VcfParserTest, ParsesMultipleAlternateAlleles)
+{
+    vcf::VcfParser parser(dataPath("multiple_alternate_alleles.vcf"));
+
+    vcf::Variant variant;
+
+    ASSERT_TRUE(parser.readNextVariant(variant));
+    ASSERT_EQ(variant.alternateAlleles.size(), 3u);
+
+    EXPECT_EQ(variant.alternateAlleles[0], "G");
+    EXPECT_EQ(variant.alternateAlleles[1], "T");
+    EXPECT_EQ(variant.alternateAlleles[2], "C");
+}
+
+TEST(VcfParserTest, ParsesInfoFields)
+{
+    vcf::VcfParser parser(dataPath("info_fields.vcf"));
+
+    vcf::Variant variant;
+
+    ASSERT_TRUE(parser.readNextVariant(variant));
+    ASSERT_EQ(variant.info.size(), 3u);
+
+    const auto &dp = variant.info[0];
+    EXPECT_EQ(dp.key, "DP");
+    ASSERT_EQ(dp.values.size(), 1u);
+    EXPECT_EQ(dp.values[0], "10");
+
+    const auto &af = variant.info[1];
+    EXPECT_EQ(af.key, "AF");
+    ASSERT_EQ(af.values.size(), 1u);
+    EXPECT_EQ(af.values[0], "0.5");
+
+    const auto &db = variant.info[2];
+    EXPECT_EQ(db.key, "DB");
+    EXPECT_TRUE(db.values.empty());
+}
+
+TEST(VcfParserTest, RejectsUnknownInfoField)
+{
+    vcf::VcfParser parser(dataPath("unknown_info.vcf"));
+    vcf::Variant variant;
+    EXPECT_THROW(parser.readNextVariant(variant), std::runtime_error);
+}
+
+TEST(VcfParserTest, RejectsUnknownFormatField)
+{
+    vcf::VcfParser parser(dataPath("unknown_format.vcf"));
+    vcf::Variant variant;
+    EXPECT_THROW(parser.readNextVariant(variant), std::runtime_error);
+}
+
+TEST(VcfParserTest, RejectsMalformedHeader)
+{
+    EXPECT_THROW(vcf::VcfParser parser(dataPath("malformed_header.vcf")), std::runtime_error);
+}
+
+TEST(VcfParserTest, RejectsMalformedVariant)
+{
+    vcf::VcfParser parser(dataPath("malformed_variant.vcf"));
+    vcf::Variant variant;
+    EXPECT_THROW(parser.readNextVariant(variant), std::runtime_error);
+}
+
+TEST(VcfParserTest, MissingFileFormat)
+{
+    EXPECT_THROW(vcf::VcfParser parser(dataPath("missing_fileformat.vcf")), std::runtime_error);
+}
