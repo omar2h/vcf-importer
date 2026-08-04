@@ -110,14 +110,14 @@ TEST(VcfParserTest, RejectsUnknownInfoField)
 {
     vcf::VcfParser parser(dataPath("unknown_info.vcf"));
     vcf::Variant variant;
-    EXPECT_THROW(parser.readNextVariant(variant), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(parser.readNextVariant(variant)), std::runtime_error);
 }
 
 TEST(VcfParserTest, RejectsUnknownFormatField)
 {
     vcf::VcfParser parser(dataPath("unknown_format.vcf"));
     vcf::Variant variant;
-    EXPECT_THROW(parser.readNextVariant(variant), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(parser.readNextVariant(variant)), std::runtime_error);
 }
 
 TEST(VcfParserTest, RejectsMalformedHeader)
@@ -129,7 +129,7 @@ TEST(VcfParserTest, RejectsMalformedVariant)
 {
     vcf::VcfParser parser(dataPath("malformed_variant.vcf"));
     vcf::Variant variant;
-    EXPECT_THROW(parser.readNextVariant(variant), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(parser.readNextVariant(variant)), std::runtime_error);
 }
 
 TEST(VcfParserTest, MissingFileFormat)
