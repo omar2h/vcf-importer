@@ -175,8 +175,10 @@ The `data` column stores the remaining selected variant fields:
     "DB": true
   },
   "FORMAT": {
-    "GT": "0/1",
-    "DP": 8
+    "37829": {
+      "GT": "0/1",
+      "DP": 8
+    }
   }
 }
 ```
