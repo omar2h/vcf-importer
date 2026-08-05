@@ -95,7 +95,7 @@ nlohmann/json and GoogleTest are downloaded automatically during CMake configura
 
 ```bash
 sudo apt update
-sudo apt install build-essential cmake libsqlite3-dev
+sudo apt install -y build-essential cmake libsqlite3-dev sqlite3
 ```
 
 ## Build
