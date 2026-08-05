@@ -236,6 +236,59 @@ Benchmarks were performed using:
 Each measured import was validated by checking that the database contained
 2,459,837 rows.
 
+### Running the benchmark
+
+Script is provided at `scripts/benchmark_import.sh`.
+
+The script performs one warm-up import followed by the configured number of
+runs. Before each run, it removes the existing SQLite database and
+associated journal files. It records elapsed wall-clock time and peak resident
+memory, then verifies the imported row count.
+
+The following environment variables are required:
+
+| Variable | Description |
+|---|---|
+| `EXECUTABLE` | Path to the `vcf_importer` executable |
+| `VCF_FILE` | Path to the input VCF file |
+| `VCF_DATABASE_PATH` | Path to the SQLite database used by the benchmark |
+
+Run the benchmark from the repository root:
+
+```bash
+EXECUTABLE=./build/src/vcf_importer \
+VCF_FILE=/path/to/assignment.final.vcf \
+VCF_DATABASE_PATH=/tmp/vcf_importer.db \
+./scripts/benchmark_import.sh
+```
+
+The following optional environment variables can override the default benchmark
+configuration:
+
+| Variable | Default | Description |
+|---|---:|---|
+| `RUNS` | `5` | Number of runs |
+| `EXPECTED_VARIANTS` | `2459837` | Expected database row count after each import |
+| `OUTPUT_DIR` | `benchmark-results` | Directory in which benchmark results are stored |
+
+Example with custom values:
+
+```bash
+EXECUTABLE=./build/src/vcf_importer \
+VCF_FILE=/path/to/assignment.final.vcf \
+VCF_DATABASE_PATH=/tmp/vcf_importer.db \
+RUNS=5 \
+EXPECTED_VARIANTS=2459837 \
+OUTPUT_DIR=benchmark-results \
+./scripts/benchmark_import.sh
+```
+
+The output directory contains:
+
+- `results.csv`, containing the elapsed time and peak RSS for every run
+- per-run timing files
+- per-run application output
+
 ## References
 
 - [VCF 4.3 Specification](https://samtools.github.io/hts-specs/VCFv4.3.pdf) — parsing behavior and field interpretation
