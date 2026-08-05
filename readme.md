@@ -101,7 +101,7 @@ sudo apt install build-essential cmake libsqlite3-dev
 ## Build
 
 ```bash
-git clone [<repository-url>](https://github.com/omar2h/vcf-importer.git)
+git clone https://github.com/omar2h/vcf-importer.git
 cd vcf-importer
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
